@@ -31,7 +31,8 @@ pub fn build(b: *std.Build) void {
     }
 
     const freetype_dep = b.dependency("freetype", .{});
-    const freetype = buildFreetype(b, target, optimize, freetype_dep, false);
+    const zlib_dep_ft = b.dependency("zlib", .{});
+    const freetype = buildFreetype(b, target, optimize, freetype_dep, zlib_dep_ft, false);
     b.installArtifact(freetype);
 
     { // game executable
@@ -100,6 +101,7 @@ pub fn build(b: *std.Build) void {
         exe_mod.linkLibrary(sdl_lib);
         exe_mod.linkLibrary(libpng);
         exe_mod.linkLibrary(freetype);
+        exe_mod.linkLibrary(zlib);
         exe_mod.addIncludePath(libpng_dep.path("."));
         exe_mod.addIncludePath(zlib_dep.path("."));
         exe_mod.addIncludePath(pnglibconf_h.dirname());
@@ -137,7 +139,7 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
         });
         wasm_mod.addImport("zmath", zmath_dep.module("root"));
-        const freetype_wasm = buildFreetype(b, wasm_target, optimize, freetype_dep, true);
+        const freetype_wasm = buildFreetype(b, wasm_target, optimize, freetype_dep, null, true);
         wasm_mod.linkLibrary(freetype_wasm);
         wasm_mod.addIncludePath(freetype_dep.path("include"));
         wasm_mod.addIncludePath(b.path("src"));
@@ -171,7 +173,7 @@ pub fn build(b: *std.Build) void {
     }
 }
 
-fn buildFreetype(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode, lib_dep: *std.Build.Dependency, wasm_no_libc: bool) *std.Build.Step.Compile {
+fn buildFreetype(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode, lib_dep: *std.Build.Dependency, zlib_dep: ?*std.Build.Dependency, wasm_no_libc: bool) *std.Build.Step.Compile {
     const lib_mod = b.createModule(.{
         .target = target,
         .optimize = optimize,
@@ -190,6 +192,7 @@ fn buildFreetype(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.
         "-DHAVE_UNISTD_H",
         "-DHAVE_FCNTL_H",
         "-fno-sanitize=undefined",
+        "-Wno-unused-command-line-argument",
     };
     const common_sources: []const []const u8 = &.{
         "autofit/autofit.c",
@@ -242,6 +245,7 @@ fn buildFreetype(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.
         lib_mod.addCSourceFiles(.{ .root = lib_dep.path("src"), .files = compressed_sources, .flags = flags });
     }
     lib_mod.addIncludePath(lib_dep.path("include"));
+    if (zlib_dep) |zd| lib_mod.addIncludePath(zd.path("."));
     if (wasm_no_libc) {
         lib_mod.addIncludePath(b.path("src"));
     } else {

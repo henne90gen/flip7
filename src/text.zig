@@ -76,7 +76,7 @@ pub const Font = struct {
 
         for (0..glyph_count) |i| {
             const c = i + ' ';
-            err = ft.FT_Load_Char(result.face, c, ft.FT_LOAD_RENDER);
+            err = ft.FT_Load_Char(result.face, @intCast(c), ft.FT_LOAD_RENDER);
             if (err != 0) {
                 return error.FontLoadGlyphFailed;
             }
